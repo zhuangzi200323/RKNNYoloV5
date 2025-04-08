@@ -27,13 +27,17 @@ import android.widget.Toast;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.sq.rknn.yolov5.databinding.ActivityMainBinding;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
-    public static final String TAG = "Yolo_Detect";
+    public static final String TAG = "MainActivity";
     private static final int REQUEST_CODE_PERMISSIONS = 10;
     private static final String[] REQUIRED_PERMISSIONS = {Manifest.permission.CAMERA};
     private ActivityMainBinding binding;
@@ -42,16 +46,28 @@ public class MainActivity extends AppCompatActivity {
     private ImageCapture imageCapture;
     private ImageAnalysis imageAnalysis;
 
+    private YoloV5Detect yolov5Detect = new YoloV5Detect();
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        labelData = readLabels();
 
         paint.setColor(Color.BLACK);
         paint.setTextSize(20f);
         paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
+        try {
+            String labelFile = "coco_80_labels_list.txt";
+            labelData = readLabels(labelFile);
+            boolean retInit = yolov5Detect.init(AssetHelper.assetFilePath(this, "yolov5s-640-640.rknn"),
+                    AssetHelper.assetFilePath(this, labelFile), false);
+            if (!retInit) {
+                Log.e(TAG, "YoloV5Detect Init failed");
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Error reading assets", e);
+        }
 
         if (allPermissionsGranted()) {
             startCamera();
@@ -118,13 +134,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateUI(ImgAnalyzer.Result result) {
+        if (result == null) {
+            return;
+        }
         runOnUiThread(() -> {
             binding.inferenceTimeValue.setText(result.processTimeMs + "ms");
             showBitmap(result);
-            for (float[] boxInfo : result.outputBox) {
-                binding.detectedItem1.setText(String.format("%s", labelData.get((int) boxInfo[5])));
-                binding.detectedItemValue1.setText(String.format("%.2f", boxInfo[4]));
+            StringBuilder textBuf = new StringBuilder();
+            for (DetectionResult.ObjectResult boxInfo : result.objectResults) {
+                textBuf.append(String.format("%s", labelData.get(boxInfo.classId)));
+                textBuf.append("->");
+                textBuf.append(String.format("%.2f", boxInfo.score));
+                textBuf.append("; ");
             }
+            binding.detectedItem1.setText(textBuf);
         });
     }
     Paint paint = new Paint();
@@ -132,31 +155,30 @@ public class MainActivity extends AppCompatActivity {
     private void showBitmap(ImgAnalyzer.Result result) {
         if (result.outputBitmap == null) return;
 
-        Bitmap mutableBitmap = result.outputBitmap.copy(Bitmap.Config.ARGB_8888, true);
-        Canvas canvas = new Canvas(mutableBitmap);
-
-
-        canvas.drawBitmap(mutableBitmap, 0.0f, 0.0f, paint);
-        for (float[] boxInfo : result.outputBox) {
-            canvas.drawText(String.format("%s:%.2f", labelData.get((int) boxInfo[5]), boxInfo[4]),
-                    boxInfo[0] - boxInfo[2] / 2, boxInfo[1] - boxInfo[3] / 2, paint);
-        }
-        binding.resultIv.setImageBitmap(mutableBitmap);
+//        Bitmap mutableBitmap = result.outputBitmap.copy(Bitmap.Config.ARGB_8888, true);
+//        Canvas canvas = new Canvas(mutableBitmap);
+//
+//        canvas.drawBitmap(mutableBitmap, 0.0f, 0.0f, paint);
+//        for (DetectionResult.ObjectResult boxInfo : result.objectResults) {
+//            canvas.drawText(String.format("%s:%.2f", labelData.get(boxInfo.classId), boxInfo.score),
+//                    boxInfo.x1 - boxInfo.x2 / 2, boxInfo.y1 - boxInfo.y2 / 2, paint);
+//        }
+        binding.resultIv.setImageBitmap(result.outputBitmap);
     }
 
-    private List<String> readLabels() {
+    private List<String> readLabels(String labelFile) {
         List<String> labels = new ArrayList<>();
-//        try {
-//            InputStream inputStream = getResources().openRawResource(R.raw.yolo_classes);
-//            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-//            String line;
-//            while ((line = bufferedReader.readLine()) != null) {
-//                labels.add(line);
-//            }
-//            inputStream.close();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
+        try {
+            InputStream inputStream = getAssets().open(labelFile);
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                labels.add(line);
+            }
+            inputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return labels;
     }
 
@@ -176,12 +198,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void setImgAnalyzer() {
         imageAnalysis.clearAnalyzer();
-        imageAnalysis.setAnalyzer(backgroundExecutor, new ImgAnalyzer(this::updateUI));
+        imageAnalysis.setAnalyzer(backgroundExecutor, new ImgAnalyzer(yolov5Detect, this::updateUI));
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         backgroundExecutor.shutdown();
+        boolean retInit = yolov5Detect.release();
+        if (!retInit) {
+            Log.e(TAG, "YoloV5Detect Release failed");
+        }
     }
 }

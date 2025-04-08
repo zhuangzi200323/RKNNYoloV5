@@ -9,6 +9,7 @@ import android.graphics.YuvImage;
 import android.media.Image;
 import android.os.AsyncTask;
 import android.os.SystemClock;
+import android.util.Log;
 
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
@@ -22,20 +23,21 @@ public class ImgAnalyzer implements ImageAnalysis.Analyzer {
     public static class Result {
         public Bitmap outputBitmap;
         public long processTimeMs;
-        public float[][] outputBox;
+        public List<DetectionResult.ObjectResult> objectResults;
 
-        public Result(long l, Bitmap outputImageBitmap, float[][] boxOutput) {
+        public Result(long l, Bitmap outputImageBitmap, List<DetectionResult.ObjectResult> objectResults) {
             this.processTimeMs = l;
             this.outputBitmap = outputImageBitmap;
-            this.outputBox = boxOutput;
+            this.objectResults = objectResults;
         }
     }
-
+    private final YoloV5Detect yolov5Detect;
     private final Callback callBack;
 
     Set<String> resultSet = new HashSet<>();
 
-    public ImgAnalyzer(Callback callBack) {
+    public ImgAnalyzer(YoloV5Detect yolov5Detect, Callback callBack) {
+        this.yolov5Detect = yolov5Detect;
         this.callBack = callBack;
 
         resultSet.add("image_out");
@@ -52,67 +54,50 @@ public class ImgAnalyzer implements ImageAnalysis.Analyzer {
     public void analyze(ImageProxy image) {
 
         AsyncTask.execute(() -> {
+            long startTime = SystemClock.uptimeMillis();
             Bitmap imgBitmap = image.toBitmap();
-            Bitmap rawBitmap = Bitmap.createScaledBitmap(imgBitmap, 224, 224, false);
+            Bitmap rawBitmap = compressBitmapTo640x640(imgBitmap);
             Bitmap bitmap = rotateBitmap(rawBitmap, 90);
             if (bitmap != null) {
-                long startTime = SystemClock.uptimeMillis();
-                byte[] rawImageBytes = convertBitmapToByteArray(bitmap);
-
-                long[] shape = {rawImageBytes.length};
-
-//                try (OrtEnvironment env = OrtEnvironment.getEnvironment()) {
-//                    try (OnnxTensor inputTensor = OnnxTensor.createTensor(
-//                            env,
-//                            ByteBuffer.wrap(rawImageBytes),
-//                            shape,
-//                            OnnxJavaType.UINT8)) {
-//                        try (OrtSession.Result output = ortSession.run(Collections.singletonMap("image", inputTensor), resultSet)) {
-//                            byte[] rawOutput = ((byte[]) output.get(0).getValue());
-//                            float[][] boxOutput = (float[][]) output.get(1).getValue();
-//                            callBack.invoke(new Result(SystemClock.uptimeMillis() - startTime, byteArrayToBitmap(rawOutput), boxOutput));
-//                        }
-//                    } catch (OrtException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                }
+                DetectionResult result = (DetectionResult)yolov5Detect.detect2(bitmap);
+                if (result != null) {
+                    for (int i = 0; i < result.objectResults.size(); i++) {
+                        Log.e("jack", "###@@@ result = " + result.objectResults.get(i).classId + ", "
+                                + result.objectResults.get(i).score + ", size = " + result.objectResults.size());
+                    }
+                    callBack.invoke(new Result(SystemClock.uptimeMillis() - startTime, bitmap, result.objectResults));
+                }
             }
 
             image.close();
         });
+    }
 
-//        // Step 1: convert image into byte array (raw image bytes)
-//        Bitmap imgBitmap = image.toBitmap();
-//        Bitmap bitmap = Bitmap.createScaledBitmap(imgBitmap, 224, 224, false);
-//        //Bitmap bitmap = rotateBitmap(rawBitmap, 90);
-//        if (bitmap != null) {
-//            long startTime = SystemClock.uptimeMillis();
-//            byte[] rawImageBytes = convertBitmapToByteArray(bitmap);
-//
-//            // Step 2: get the shape of the byte array and make ort tensor
-//            long[] shape = {rawImageBytes.length};
-//
-//            try (OrtEnvironment env = OrtEnvironment.getEnvironment()) {
-//                try (OnnxTensor inputTensor = OnnxTensor.createTensor(
-//                        env,
-//                        ByteBuffer.wrap(rawImageBytes),
-//                        shape,
-//                        OnnxJavaType.UINT8)) {
-//                    // Step 3: call ort inferenceSession run
-//                    try (OrtSession.Result output = ortSession.run(Collections.singletonMap("image", inputTensor), resultSet)) {
-//                        // Step 4: output analysis
-//                        byte[] rawOutput = ((byte[]) output.get(1).getValue());
-//                        float[][] boxOutput = (float[][]) output.get(0).getValue();
-//                        // Step 5: set output result
-//                        callBack.invoke(new Result(SystemClock.uptimeMillis() - startTime, byteArrayToBitmap(rawOutput), boxOutput));
-//                    }
-//                } catch (OrtException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            }
-//        }
-//
-//        image.close();
+    public Bitmap compressBitmapTo640x640(Bitmap originalBitmap) {
+        int originalWidth = originalBitmap.getWidth();
+        int originalHeight = originalBitmap.getHeight();
+
+        // 计算宽高比
+        float ratio = (float) originalWidth / originalHeight;
+
+        int newWidth;
+        int newHeight;
+
+        // 根据宽高比计算缩放后的宽高
+        if (ratio > 1) {
+            newWidth = 640;
+            newHeight = (int) (640 / ratio);
+        } else {
+            newHeight = 640;
+            newWidth = (int) (640 * ratio);
+        }
+
+        // 创建缩放矩阵
+        Matrix matrix = new Matrix();
+        matrix.postScale((float) newWidth / originalWidth, (float) newHeight / originalHeight);
+
+        // 进行缩放
+        return Bitmap.createBitmap(originalBitmap, 0, 0, originalWidth, originalHeight, matrix, true);
     }
 
     public byte[] convertBitmapToByteArray(Bitmap bitmap) {

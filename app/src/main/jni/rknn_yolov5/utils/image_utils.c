@@ -584,8 +584,8 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
         p_imcolor[1] = color;
         p_imcolor[2] = color;
         p_imcolor[3] = color;
-        LOGI("fill dst image (x y w h)=(%d %d %d %d) with color=0x%x\n",
-            dst_whole_rect.x, dst_whole_rect.y, dst_whole_rect.width, dst_whole_rect.height, imcolor);
+//        LOGI("fill dst image (x y w h)=(%d %d %d %d) with color=0x%x\n",
+//            dst_whole_rect.x, dst_whole_rect.y, dst_whole_rect.width, dst_whole_rect.height, imcolor);
         ret_rga = imfill(rga_buf_dst, dst_whole_rect, imcolor);
         if (ret_rga <= 0) {
             if (dst != NULL) {
@@ -622,17 +622,17 @@ int convert_image(image_buffer_t* src_img, image_buffer_t* dst_img, image_rect_t
 {
     int ret;
  
-    LOGI("src width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
-        src_img->width, src_img->height, src_img->format, src_img->virt_addr, src_img->fd);
-    LOGI("dst width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
-        dst_img->width, dst_img->height, dst_img->format, dst_img->virt_addr, dst_img->fd);
-    if (src_box != NULL) {
-        LOGI("src_box=(%d %d %d %d)\n", src_box->left, src_box->top, src_box->right, src_box->bottom);
-    }
-    if (dst_box != NULL) {
-        LOGI("dst_box=(%d %d %d %d)\n", dst_box->left, dst_box->top, dst_box->right, dst_box->bottom);
-    }
-    LOGI("color=0x%x\n", color);
+//    LOGI("src width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
+//        src_img->width, src_img->height, src_img->format, src_img->virt_addr, src_img->fd);
+//    LOGI("dst width=%d height=%d fmt=0x%x virAddr=0x%p fd=%d\n",
+//        dst_img->width, dst_img->height, dst_img->format, dst_img->virt_addr, dst_img->fd);
+//    if (src_box != NULL) {
+//        LOGI("src_box=(%d %d %d %d)\n", src_box->left, src_box->top, src_box->right, src_box->bottom);
+//    }
+//    if (dst_box != NULL) {
+//        LOGI("dst_box=(%d %d %d %d)\n", dst_box->left, dst_box->top, dst_box->right, dst_box->bottom);
+//    }
+//    LOGI("color=0x%x\n", color);
 
     ret = convert_image_rga(src_img, dst_img, src_box, dst_box, color);
     if (ret != 0) {
@@ -713,9 +713,9 @@ int convert_image_with_letterbox(image_buffer_t* src_image, image_buffer_t* dst_
         dst_box.right = dst_box.left + resize_w - 1;
         _left_offset = dst_box.left;
     }
-    LOGI("scale=%f dst_box=(%d %d %d %d) allow_slight_change=%d _left_offset=%d _top_offset=%d padding_w=%d padding_h=%d\n",
-        scale, dst_box.left, dst_box.top, dst_box.right, dst_box.bottom, allow_slight_change,
-        _left_offset, _top_offset, padding_w, padding_h);
+//    LOGI("scale=%f dst_box=(%d %d %d %d) allow_slight_change=%d _left_offset=%d _top_offset=%d padding_w=%d padding_h=%d\n",
+//        scale, dst_box.left, dst_box.top, dst_box.right, dst_box.bottom, allow_slight_change,
+//        _left_offset, _top_offset, padding_w, padding_h);
 
     //set offset and scale
     if(letterbox != NULL){

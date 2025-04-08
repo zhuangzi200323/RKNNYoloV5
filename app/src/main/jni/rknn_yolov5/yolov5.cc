@@ -210,12 +210,12 @@ int inference_yolov5_model(rknn_app_context_t *app_ctx, image_buffer_t *img,
 
     // 5.进行模型推理
     // Run
-    LOGI("rknn_run\n");
+//    LOGI("rknn_run\n");
     start_us = getCurrentTimeUs();
     ret = rknn_run(app_ctx->rknn_ctx, nullptr);
     elapse_us = getCurrentTimeUs() - start_us;
-    LOGI("normal Elapse Time = %.2fms, FPS = %.2f\n", elapse_us / 1000.f,
-         1000.f * 1000.f / elapse_us);
+//    LOGI("normal Elapse Time = %.2fms, FPS = %.2f\n", elapse_us / 1000.f,
+//         1000.f * 1000.f / elapse_us);
     if (ret < 0) {
         LOGE("rknn_run fail! ret=%d\n", ret);
         goto out;
